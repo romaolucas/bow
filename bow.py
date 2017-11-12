@@ -6,28 +6,23 @@ import sklearn.feature_extraction.text as txt
 from nltk.corpus import stopwords
 
 def clear_text(raw_text):
-    letters_only = re.sub("[^a-zA-Z]", "", raw_text)
-    lowered_case = letters_only.lower()
+    lowered_case = raw_text.lower()
+    letters_only = re.sub(r"http\S+", "", lowered_case)
+    letters_only = re.sub("[\d,.?\-_!;:<>/\\\\\"\\'@…]", "", letters_only)
     stopwords_portuguese = stopwords.words('portuguese')
-    words = lowered_case.split()
+    words = letters_only.split()
     words = [w for w in words if w not in stopwords_portuguese]
     return (" ".join(words))
 
-def read_corpus(filename):
+def get_info_from(filename):
     corpus = []
-    with open(filename, mode="r") as input:
-        reader = csv.DictReader(input, delimiter=",")
-        for row in reader:
-            corpus.append(row['tweet'])
-    return corpus
-
-def read_labels(filename):
     labels = []
     with open(filename, mode="r") as input:
         reader = csv.DictReader(input, delimiter=",")
         for row in reader:
+            corpus.append(row['tweet'])
             labels.append(row['review'])
-    return labels
+    return corpus, labels
 
 def clear_corpus(corpus):
     clean_corpus = []
@@ -42,7 +37,7 @@ def vectorize_frequency(corpus):
             stop_words=None, \
             max_features=5000)
     corpus_features = vectorizer.fit_transform(corpus)
-    return corpus_features.toarray()
+    return vectorizer, corpus_features.toarray()
 
 def vectorize_binary(corpus):
     vectorizer = txt.CountVectorizer(analyzer="word", \
@@ -52,7 +47,7 @@ def vectorize_binary(corpus):
             binary=True, \
             max_features=5000)
     corpus_features = vectorizer.fit_transform(corpus)
-    return corpus_features.toarray()
+    return vectorizer, corpus_features.toarray()
 
 def vectorize_tf_idf(corpus):
     vectorizer = txt.TfidfVectorizer(analyzer="word", \
@@ -61,7 +56,7 @@ def vectorize_tf_idf(corpus):
             stop_words=None, \
             max_features=5000)
     corpus_features =  vectorizer.fit_transform(corpus)
-    return corpus_features.toarray()
+    return vectorizer, corpus_features.toarray()
 
 def write_to_csv(corpus_features, labels, filename):
     fieldnames = ['x' + str(i) for i in range(corpus_features.shape[1])]
@@ -80,14 +75,16 @@ def main(filename):
     if filename is None:
         raise RuntimeError("Por favor, forneca um nome de arquivo")
         sys.exit(1)
-    corpus = read_corpus(filename)
-    labels = read_labels(filename)
+    corpus, labels = get_info_from(filename)
     clean_corpus = clear_corpus(corpus)
-    tfs = vectorize_tf_idf(clean_corpus)
-    freqs = vectorize_frequency(clean_corpus)
-    binaries = vectorize_binary(clean_corpus)
+    vectorizer_tf, tfs = vectorize_tf_idf(clean_corpus)
+    vectorizer_freq, freqs = vectorize_frequency(clean_corpus)
+    vectorizer_binary, binaries = vectorize_binary(clean_corpus)
+    print("gerando csv com as frequencias")
     write_to_csv(freqs, labels, "output_freq.csv")
+    print("gerando csv com tf-idf")
     write_to_csv(tfs, labels, "output_tf.csv")
+    print("gerando csv com vetor binario")
     write_to_csv(binaries, labels, "output_binary.csv")
 
 if __name__ == '__main__':
